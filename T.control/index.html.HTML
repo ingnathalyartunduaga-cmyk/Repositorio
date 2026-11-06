@@ -1,0 +1,696 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tablero de Control - Seguimiento Servicios Sociales</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <!-- SheetJS para carga y exportación de archivos Excel -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <style>
+    .badge-green { background-color: #dcfce7; color: #15803d; border: 1px solid #86efac; }
+    .badge-yellow { background-color: #fef9c3; color: #a16207; border: 1px solid #fde047; }
+    .badge-red { background-color: #fee2e2; color: #b91c1c; border: 1px solid #fca5a5; }
+    .badge-gray { background-color: #f1f5f9; color: #64748b; border: 1px solid #cbd5e1; }
+    .card-kpi { transition: transform 0.15s ease-in-out; }
+    .card-kpi:hover { transform: translateY(-2px); }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen">
+
+  <!-- Header -->
+  <header class="bg-indigo-950 text-white shadow-md sticky top-0 z-50">
+    <div class="max-w-7xl mx-auto px-4 py-3 flex flex-wrap justify-between items-center gap-3">
+      <div class="flex items-center space-x-3">
+        <div class="bg-indigo-700 p-2 rounded-lg shadow">
+          <i data-lucide="layout-dashboard" class="w-6 h-6 text-indigo-100"></i>
+        </div>
+        <div>
+          <h1 class="text-lg font-bold leading-tight">Tablero de Control de Servicios Sociales</h1>
+          <p class="text-xs text-indigo-300">Subdirección Local de Ciudad Bolívar | Seguimiento a metas 2026 | Nathaly Artunduaga</p>
+        </div>
+      </div>
+      <div class="flex items-center space-x-2">
+        <label class="cursor-pointer bg-indigo-900 hover:bg-indigo-800 text-indigo-100 text-xs py-2 px-3 rounded-lg border border-indigo-700 transition flex items-center gap-1.5 shadow-sm">
+          <i data-lucide="upload" class="w-4 h-4"></i>
+          <span>Cargar Excel</span>
+          <input type="file" id="excelFileInput" accept=".xlsx, .xls" class="hidden">
+        </label>
+        <button id="btnRestaurarBase" class="bg-indigo-900 hover:bg-indigo-800 text-indigo-200 text-xs py-2 px-3 rounded-lg border border-indigo-700 transition flex items-center gap-1.5 shadow-sm" title="Restaurar base de datos inicial">
+          <i data-lucide="database-backup" class="w-4 h-4"></i>
+          <span>Base Oficial</span>
+        </button>
+        <button id="btnExport" class="bg-emerald-600 hover:bg-emerald-500 text-white text-xs py-2 px-3 rounded-lg transition flex items-center gap-1.5 shadow-sm">
+          <i data-lucide="download" class="w-4 h-4"></i>
+          <span>Exportar Datos Limpios</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main class="max-w-7xl mx-auto px-4 py-6 space-y-6">
+
+    <!-- Tarjetas de Resumen (KPIs) -->
+    <section class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+      <div class="card-kpi bg-white p-3.5 rounded-xl border border-slate-200 shadow-sm">
+        <span class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Registros</span>
+        <div class="text-xl font-bold text-slate-800 mt-1" id="kpiUnidades">0</div>
+        <div class="text-[11px] text-slate-400 mt-0.5">Filas evaluadas</div>
+      </div>
+
+      <div class="card-kpi bg-white p-3.5 rounded-xl border border-slate-200 shadow-sm">
+        <span class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Cob. Programada</span>
+        <div class="text-xl font-bold text-blue-700 mt-1" id="kpiProg">0</div>
+        <div class="text-[11px] text-slate-400 mt-0.5">Meta acumulada</div>
+      </div>
+
+      <div class="card-kpi bg-white p-3.5 rounded-xl border border-slate-200 shadow-sm">
+        <span class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Cob. Ejecutada</span>
+        <div class="text-xl font-bold text-indigo-700 mt-1" id="kpiEjec">0</div>
+        <div class="text-[11px] text-slate-400 mt-0.5">Atención efectiva</div>
+      </div>
+
+      <div class="card-kpi bg-white p-3.5 rounded-xl border border-slate-200 shadow-sm">
+        <span class="text-xs font-semibold text-slate-500 uppercase tracking-wider">% Cumplimiento</span>
+        <div class="text-xl font-bold text-slate-900 mt-1" id="kpiCump">0.0%</div>
+        <div class="text-[11px] text-slate-400 mt-0.5">Ponderado global</div>
+      </div>
+
+      <div class="card-kpi bg-white p-3.5 rounded-xl border border-emerald-200 shadow-sm">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-semibold text-emerald-700 uppercase">Óptimo (≥80%)</span>
+          <span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
+        </div>
+        <div class="text-xl font-bold text-emerald-800 mt-1" id="kpiVerde">0</div>
+        <div class="text-[11px] text-emerald-600 font-medium mt-0.5" id="kpiVerdePct">0% con meta</div>
+      </div>
+
+      <div class="card-kpi bg-white p-3.5 rounded-xl border border-amber-200 shadow-sm">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-semibold text-amber-700 uppercase">Alerta / Crítico</span>
+          <div class="flex space-x-1">
+            <span class="w-2.5 h-2.5 rounded-full bg-amber-400"></span>
+            <span class="w-2.5 h-2.5 rounded-full bg-rose-500"></span>
+          </div>
+        </div>
+        <div class="text-xl font-bold text-amber-900 mt-1 flex items-baseline gap-2">
+          <span id="kpiAmarillo">0</span> <span class="text-xs font-normal text-slate-400">/</span> <span id="kpiRojo" class="text-rose-600">0</span>
+        </div>
+        <div class="text-[11px] text-slate-500 mt-0.5">Amarillo (<80%) / Rojo (<60%)</div>
+      </div>
+    </section>
+
+    <!-- Filtros de Navegación -->
+    <section class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-3">
+      <div class="flex items-center justify-between border-b pb-2">
+        <div class="flex items-center gap-2 text-slate-700 font-semibold text-sm">
+          <i data-lucide="filter" class="w-4 h-4 text-indigo-600"></i>
+          <span>Filtros Dinámicos del Tablero</span>
+        </div>
+        <button id="btnResetFilters" class="text-xs text-indigo-600 hover:text-indigo-800 font-medium hover:underline flex items-center gap-1">
+          <i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i>
+          <span>Restablecer Filtros</span>
+        </button>
+      </div>
+
+      <!-- 6 Filtros -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3 text-xs">
+        <!-- 1. Mes -->
+        <div>
+          <label class="block font-medium text-slate-600 mb-1">Mes de Operación</label>
+          <select id="filtroMes" class="w-full bg-slate-50 border border-slate-300 rounded-lg p-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+            <option value="Todos">Todos los meses (Vigencia 2026)</option>
+            <option value="Enero">Enero 2026</option>
+            <option value="Febrero">Febrero 2026</option>
+            <option value="Marzo">Marzo 2026</option>
+            <option value="Abril">Abril 2026</option>
+            <option value="Mayo">Mayo 2026</option>
+            <option value="Junio">Junio 2026</option>
+            <option value="Julio">Julio 2026</option>
+            <option value="Agosto">Agosto 2026</option>
+            <option value="Septiembre">Septiembre 2026</option>
+            <option value="Octubre">Octubre 2026</option>
+            <option value="Noviembre">Noviembre 2026</option>
+            <option value="Diciembre">Diciembre 2026</option>
+          </select>
+        </div>
+
+        <!-- 2. Servicio Social -->
+        <div>
+          <label class="block font-medium text-slate-600 mb-1">Servicio Social</label>
+          <select id="filtroServicio" class="w-full bg-slate-50 border border-slate-300 rounded-lg p-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+            <option value="Todos">Todos los servicios</option>
+          </select>
+        </div>
+
+        <!-- 3. Modalidad (Opciones extraídas del Excel) -->
+        <div>
+          <label class="block font-medium text-slate-600 mb-1">Modalidad</label>
+          <select id="filtroModalidad" class="w-full bg-slate-50 border border-slate-300 rounded-lg p-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none truncate">
+            <option value="Todos">Todas las modalidades</option>
+            <option value="No Aplica">No Aplica</option>
+            <option value="Apoyos Económicos">Apoyos Económicos</option>
+            <option value="Casas de Memoria Lúdica">Casas de Memoria Lúdica</option>
+            <option value="Casas de Pensamiento Intercultural">Casas de Pensamiento Intercultural</option>
+            <option value="Centro amar modalidad complementaria">Centro amar modalidad complementaria</option>
+            <option value="Centro Día al Barrio">Centro Día al Barrio</option>
+            <option value="Centro Día Redes de Cuidado Comunitario">Centro Día Redes de Cuidado Comunitario</option>
+            <option value="Centros de Atención Integral al Migrante">Centros de Atención Integral al Migrante (CEDID, CDS, CIAM, POM)</option>
+            <option value="Crecemos en la Ruralidad">Crecemos en la Ruralidad</option>
+            <option value="Espacios Rurales">Espacios Rurales</option>
+            <option value="Jardín Infantil Nocturno">Jardín Infantil Nocturno</option>
+          </select>
+        </div>
+
+        <!-- 4. Nombre / Código Unidad Operativa -->
+        <div>
+          <label class="block font-medium text-slate-600 mb-1">Unidad Operativa (Nombre/Código)</label>
+          <div class="relative">
+            <input type="text" id="filtroUnidad" placeholder="Ej: 277, Arborizadora, 122..." class="w-full bg-slate-50 border border-slate-300 rounded-lg pl-2.5 pr-7 py-2 text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+            <i data-lucide="building-2" class="w-3.5 h-3.5 text-slate-400 absolute right-2.5 top-2.5 pointer-events-none"></i>
+          </div>
+        </div>
+
+        <!-- 5. Supervisión / Operación -->
+        <div>
+          <label class="block font-medium text-slate-600 mb-1">Supervisión / Operación</label>
+          <select id="filtroSupervision" class="w-full bg-slate-50 border border-slate-300 rounded-lg p-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+            <option value="Todos">Todas las opciones</option>
+          </select>
+        </div>
+
+        <!-- 6. Semaforización -->
+        <div>
+          <label class="block font-medium text-slate-600 mb-1">Semaforización</label>
+          <select id="filtroSemaforo" class="w-full bg-slate-50 border border-slate-300 rounded-lg p-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none font-medium">
+            <option value="Todos">Todos los estados</option>
+            <option value="Verde">🟢 Óptimo (≥ 80%)</option>
+            <option value="Amarillo">🟡 Moderado (60% - 79%)</option>
+            <option value="Rojo">🔴 Crítico (< 60%)</option>
+            <option value="No Aplica">⚪ A Demanda / Sin Programación</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Buscador de texto libre global -->
+      <div class="relative pt-1">
+        <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3 top-3.5"></i>
+        <input type="text" id="filtroBuscar" placeholder="Búsqueda rápida general (código de unidad, modalidad, palabras clave...)" class="w-full pl-9 pr-4 py-2 text-xs bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+      </div>
+    </section>
+
+    <!-- Gráficas y Tabla -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      
+      <!-- Columna Gráficas -->
+      <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-between space-y-4">
+        <div>
+          <h3 class="text-xs font-bold uppercase text-slate-600 mb-2 flex items-center gap-1.5">
+            <i data-lucide="pie-chart" class="w-4 h-4 text-indigo-600"></i>
+            Distribución de Semaforización
+          </h3>
+          <div class="relative h-48 flex items-center justify-center">
+            <canvas id="chartSemaforos"></canvas>
+          </div>
+          <div class="border-t pt-2.5 mt-2 space-y-1.5 text-[11px] text-slate-500">
+            <div class="flex justify-between items-center">
+              <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span> Óptimo (≥80%)</span>
+              <span class="font-semibold text-slate-700" id="legendVerde">0</span>
+            </div>
+            <div class="flex justify-between items-center">
+              <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-amber-400"></span> Moderado (60-79%)</span>
+              <span class="font-semibold text-slate-700" id="legendAmarillo">0</span>
+            </div>
+            <div class="flex justify-between items-center">
+              <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-rose-500"></span> Crítico (<60%)</span>
+              <span class="font-semibold text-slate-700" id="legendRojo">0</span>
+            </div>
+            <div class="flex justify-between items-center">
+              <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-slate-300"></span> A Demanda / Sin Programación</span>
+              <span class="font-semibold text-slate-700" id="legendNA">0</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Mini resumen de cobertura -->
+        <div class="bg-indigo-50/70 p-3 rounded-lg border border-indigo-100 text-xs">
+          <div class="font-semibold text-indigo-950 flex items-center gap-1.5 mb-1">
+            <i data-lucide="info" class="w-3.5 h-3.5 text-indigo-600"></i>
+            <span>Comportamiento del Período</span>
+          </div>
+          <p class="text-[11px] text-slate-600 leading-relaxed" id="lblResumenPeriodo">
+            Visualizando datos consolidados del año. Selecciona un mes específico para analizar su comportamiento mensual.
+          </p>
+        </div>
+      </div>
+
+      <!-- Columna Tabla de Detalle -->
+      <div class="lg:col-span-2 bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
+        <div class="p-3.5 border-b flex justify-between items-center bg-slate-50">
+          <div class="flex items-center gap-2">
+            <i data-lucide="table" class="w-4 h-4 text-indigo-600"></i>
+            <span class="text-xs font-bold uppercase text-slate-700">Detalle de Unidades y Servicios</span>
+          </div>
+          <span class="text-xs text-slate-500 font-medium" id="lblResultadosCount">Cargando datos...</span>
+        </div>
+
+        <div class="overflow-x-auto flex-1 max-h-[540px]">
+          <table class="w-full text-left border-collapse text-xs">
+            <thead class="bg-slate-100 text-slate-600 uppercase tracking-wider text-[11px] sticky top-0 z-10 border-b">
+              <tr>
+                <th class="py-2.5 px-3">Mes</th>
+                <th class="py-2.5 px-3">Servicio Social</th>
+                <th class="py-2.5 px-3">Modalidad</th>
+                <th class="py-2.5 px-3">Nombre Unidad Operativa</th>
+                <th class="py-2.5 px-3">Supervisión / Operación</th>
+                <th class="py-2.5 px-3 text-right">Cob. Prog</th>
+                <th class="py-2.5 px-3 text-right">Cob. Ejec</th>
+                <th class="py-2.5 px-3 text-center">Cumplimiento</th>
+              </tr>
+            </thead>
+            <tbody id="tablaCuerpo" class="divide-y divide-slate-200 text-slate-700"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    // Normalizador de texto: sin tildes, saltos de línea ni caracteres especiales
+    function normalizeStr(str) {
+      if (!str) return '';
+      return String(str)
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .toLowerCase()
+        .replace(/\s+/g, ' ')
+        .trim();
+    }
+
+    // Normalizador de nombre de modalidad según las categorías oficiales del Excel
+    function sanitizeModalidad(modStr) {
+      if (!modStr) return 'No Aplica';
+      const m = String(modStr).trim();
+      if (m.includes('CEDID') || m.includes('CIAM') || m.includes('Atención Integral al Migrante') || m.includes('SUPERCADE Social')) {
+        return 'Centros de Atención Integral al Migrante';
+      }
+      if (m === 'Servicio Apoyos Económicos') {
+        return 'Apoyos Económicos';
+      }
+      return m;
+    }
+
+    // Datos oficiales precargados
+    window.BASE_DEFAULT_DATA = [{"mes": "Enero", "servicio": "Jardines Infantiles Diurnos", "modalidad": "No Aplica", "unidad": "277-JINF-SDIS-Arborizadora Alta", "supervision": "Operación Subdirección técnica local", "prog": 0, "ejec": 0, "cump": 0.0, "tieneMeta": false}, {"mes": "Enero", "servicio": "Jardines Infantiles Diurnos", "modalidad": "No Aplica", "unidad": "279-JINF-SDIS-La Estancia", "supervision": "Operación Subdirección técnica local", "prog": 0, "ejec": 0, "cump": 0.0, "tieneMeta": false}, {"mes": "Enero", "servicio": "Jardines Infantiles Diurnos", "modalidad": "No Aplica", "unidad": "10133-JINF-SDIS- Afro Manglar del Paraiso", "supervision": "Operación Subdirección técnica local", "prog": 0, "ejec": 0, "cump": 0.0, "tieneMeta": false}, {"mes": "Enero", "servicio": "Jardines Infantiles Diurnos", "modalidad": "No Aplica", "unidad": "111474-JINF-SDIS-Arborizadora Baja", "supervision": "Operación Subdirección técnica local", "prog": 0, "ejec": 0, "cump": 0.0, "tieneMeta": false}, {"mes": "Enero", "servicio": "Jardines Infantiles Diurnos", "modalidad": "No Aplica", "unidad": "121042-JINF-SDIS-Candelaria", "supervision": "Operación Subdirección técnica local", "prog": 0, "ejec": 0, "cump": 0.0, "tieneMeta": false}, {"mes": "Enero", "servicio": "Jardines Infantiles Diurnos", "modalidad": "No Aplica", "unidad": "121043-JINF-SDIS-Maravillas Infantiles Nueva Colombia Sur", "supervision": "Operación Subdirección técnica local", "prog": 0, "ejec": 0, "cump": 0.0, "tieneMeta": false}, {"mes": "Enero", "servicio": "Jardines Infantiles Diurnos", "modalidad": "No Aplica", "unidad": "121623-JINF-SDIS-Preguntario", "supervision": "Operación Subdirección técnica local", "prog": 0, "ejec": 0, "cump": 0.0, "tieneMeta": false}, {"mes": "Enero", "servicio": "Jardines Infantiles Diurnos", "modalidad": "No Aplica", "unidad": "121674-JINF-SDIS-Arabia", "supervision": "Operación Subdirección técnica local", "prog": 0, "ejec": 0, "cump": 0.0, "tieneMeta": false}, {"mes": "Enero", "servicio": "Jardines Infantiles Diurnos", "modalidad": "No Aplica", "unidad": "121739-JINF-SDIS-Estrella del Mañana", "supervision": "Operación Subdirección técnica local", "prog": 0, "ejec": 0, "cump": 0.0, "tieneMeta": false}, {"mes": "Enero", "servicio": "Jardines Infantiles Diurnos", "modalidad": "No Aplica", "unidad": "122123-JINF-SDIS-Acacia Sur", "supervision": "Operación Subdirección técnica local", "prog": 0, "ejec": 0, "cump": 0.0, "tieneMeta": false}, {"mes": "Enero", "servicio": "Jardines Infantiles Diurnos", "modalidad": "No Aplica", "unidad": "122124-JINF-SDIS-Barlovento", "supervision": "Operación Subdirección técnica local", "prog": 0, "ejec": 0, "cump": 0.0, "tieneMeta": false}, {"mes": "Enero", "servicio": "Jardines Infantiles Diurnos", "modalidad": "No Aplica", "unidad": "122125-JINF-SDIS-Cartagena De Indias", "supervision": "Operación Subdirección técnica local", "prog": 0, "ejec": 0, "cump": 0.0, "tieneMeta": false}, {"mes": "Enero", "servicio": "Jardines Infantiles Diurnos", "modalidad": "No Aplica", "unidad": "122129-JINF-SDIS-JJ Rondon Niño Jesus", "supervision": "Operación Subdirección técnica local", "prog": 0, "ejec": 0, "cump": 0.0, "tieneMeta": false}, {"mes": "Enero", "servicio": "Jardines Infantiles Diurnos", "modalidad": "No Aplica", "unidad": "122130-JINF-SDIS-JJ Rondon Alto De La Cruz", "supervision": "Operación Subdirección técnica local", "prog": 0, "ejec": 0, "cump": 0.0, "tieneMeta": false}, {"mes": "Enero", "servicio": "Jardines Infantiles Diurnos", "modalidad": "No Aplica", "unidad": "122131-JINF-SDIS-La Casona", "supervision": "Operación Subdirección técnica local", "prog": 0, "ejec": 0, "cump": 0.0, "tieneMeta": false}, {"mes": "Enero", "servicio": "Jardines Infantiles Diurnos", "modalidad": "No Aplica", "unidad": "122132-JINF-SDIS-La Estancia Mis Primeras Letras", "supervision": "Operación Subdirección técnica local", "prog": 0, "ejec": 0, "cump": 0.0, "tieneMeta": false}, {"mes": "Enero", "servicio": "Jardines Infantiles Diurnos", "modalidad": "No Aplica", "unidad": "122133-JINF-SDIS-Los Niños Traviesos", "supervision": "Operación Subdirección técnica local", "prog": 0, "ejec": 0, "cump": 0.0, "tieneMeta": false}, {"mes": "Enero", "servicio": "Jardines Infantiles Diurnos", "modalidad": "No Aplica", "unidad": "122135-JINF-SDIS-Manuela Beltran Mis Pequeñas Travesuras", "supervision": "Operación Subdirección técnica local", "prog": 0, "ejec": 0, "cump": 0.0, "tieneMeta": false}, {"mes": "Enero", "servicio": "Jardines Infantiles Diurnos", "modalidad": "No Aplica", "unidad": "122136-JINF-SDIS-Manitas", "supervision": "Operación Subdirección técnica local", "prog": 0, "ejec": 0, "cump": 0.0, "tieneMeta": false}, {"mes": "Enero", "servicio": "Jardines Infantiles Diurnos", "modalidad": "No Aplica", "unidad": "122137-JINF-SDIS-Mi Refugio", "supervision": "Operación Subdirección técnica local", "prog": 0, "ejec": 0, "cump": 0.0, "tieneMeta": false}, {"mes": "Enero", "servicio": "Jardines Infantiles Diurnos", "modalidad": "No Aplica", "unidad": "122138-JINF-SDIS-Minuto de María", "supervision": "Operación Subdirección técnica local", "prog": 0, "ejec": 0, "cump": 0.0, "tieneMeta": false}, {"mes": "Enero", "servicio": "Jardines Infantiles Diurnos", "modalidad": "No Aplica", "unidad": "122139-JINF-SDIS-Nuestra Esperanza Compartir", "supervision": "Operación Subdirección técnica local", "prog": 0, "ejec": 0, "cump": 0.0, "tieneMeta": false}, {"mes": "Enero", "servicio": "Jardines Infantiles Diurnos", "modalidad": "No Aplica", "unidad": "122140-JINF-SDIS-Santa Rosita de Las Vegas", "supervision": "Operación Subdirección técnica local", "prog": 0, "ejec": 0, "cump": 0.0, "tieneMeta": false}, {"mes": "Enero", "servicio": "Jardines Infantiles Diurnos", "modalidad": "No Aplica", "unidad": "122230-JINF-SDIS-Semilleros del Futuro Millan", "supervision": "Operación Subdirección técnica local", "prog": 0, "ejec": 0, "cump": 0.0, "tieneMeta": false}, {"mes": "Enero", "servicio": "Jardines Infantiles Diurnos", "modalidad": "No Aplica", "unidad": "122282-JINF-SDIS-Analu Verbenal Quiba", "supervision": "Operación Subdirección técnica local", "prog": 0, "ejec": 0, "cump": 0.0, "tieneMeta": false}, {"mes": "Enero", "servicio": "Jardines Infantiles Diurnos", "modalidad": "No Aplica", "unidad": "122342-JINF-SDIS-La Estrella", "supervision": "Operación Subdirección técnica local", "prog": 0, "ejec": 0, "cump": 0.0, "tieneMeta": false}, {"mes": "Enero", "servicio": "Jardines Infantiles Diurnos", "modalidad": "No Aplica", "unidad": "122757-JINF-SDIS-Dejando-Huella", "supervision": "Operación Subdirección técnica local", "prog": 0, "ejec": 0, "cump": 0.0, "tieneMeta": false}, {"mes": "Enero", "servicio": "Jardines Infantiles Diurnos", "modalidad": "No Aplica", "unidad": "122178-JINF-SDIS-Aliso del Mochuelo", "supervision": "Operación Subdirección técnica local", "prog": 0, "ejec": 0, "cump": 0.0, "tieneMeta": false}, {"mes": "Enero", "servicio": "Jardines Infantiles Diurnos", "modalidad": "No Aplica", "unidad": "1097-JINF-CC-Caminos De La Vida-", "supervision": "Operación Subdirección técnica local", "prog": 0, "ejec": 0, "cump": 0.0, "tieneMeta": false}, {"mes": "Enero", "servicio": "Jardines Infantiles Diurnos", "modalidad": "No Aplica", "unidad": "113264-JINF-CC-Semillitas De Amor-", "supervision": "Operación Subdirección técnica local", "prog": 0, "ejec": 0, "cump": 0.0, "tieneMeta": false}, {"mes": "Enero", "servicio": "Jardines Infantiles Diurnos", "modalidad": "No Aplica", "unidad": "120519-JINF-CC-Manantial", "supervision": "Operación Subdirección técnica local", "prog": 0, "ejec": 0, "cump": 0.0, "tieneMeta": false}, {"mes": "Enero", "servicio": "Jardines Infantiles Diurnos", "modalidad": "No Aplica", "unidad": "120931-JINF-CC-Waldorf-", "supervision": "Operación Subdirección técnica local", "prog": 0, "ejec": 0, "cump": 0.0, "tieneMeta": false}, {"mes": "Enero", "servicio": "Jardines Infantiles Diurnos", "modalidad": "No Aplica", "unidad": "121050-JINF-CC-La Casa de JJ", "supervision": "Operación Subdirección técnica local", "prog": 0, "ejec": 0, "cump": 0.0, "tieneMeta": false}, {"mes": "Enero", "servicio": "Jardines Infantiles Diurnos", "modalidad": "No Aplica", "unidad": "121052-JINF-CC-Caracoli", "supervision": "Operación Subdirección técnica local", "prog": 0, "ejec": 0, "cump": 0.0, "tieneMeta": false}, {"mes": "Enero", "servicio": "Jardines Infantiles Diurnos", "modalidad": "No Aplica", "unidad": "121074-JINF-CC-Castillo San Lucas María Cano", "supervision": "Operación Subdirección técnica local", "prog": 0, "ejec": 0, "cump": 0.0, "tieneMeta": false}, {"mes": "Enero", "servicio": "Jardines Infantiles Diurnos", "modalidad": "No Aplica", "unidad": "121640-JINF-CC-Salamandra", "supervision": "Operación Subdirección técnica local", "prog": 0, "ejec": 0, "cump": 0.0, "tieneMeta": false}, {"mes": "Enero", "servicio": "Jardines Infantiles Diurnos", "modalidad": "No Aplica", "unidad": "10124-JINF-JS--Buenavista-", "supervision": "Operación Subdirección técnica local", "prog": 0, "ejec": 0, "cump": 0.0, "tieneMeta": false}, {"mes": "Enero", "servicio": "Jardines Infantiles Diurnos", "modalidad": "No Aplica", "unidad": "113940-JINF-JS-Los Robles-", "supervision": "Operación Subdirección técnica local", "prog": 0, "ejec": 0, "cump": 0.0, "tieneMeta": false}, {"mes": "Enero", "servicio": "Jardines Infantiles Diurnos", "modalidad": "No Aplica", "unidad": "122010-JINF-JS-Los Urapanes", "supervision": "Operación Subdirección técnica local", "prog": 0, "ejec": 0, "cump": 0.0, "tieneMeta": false}, {"mes": "Enero", "servicio": "Jardines Infantiles Diurnos", "modalidad": "No Aplica", "unidad": "121854-JINF-CC-Castillo San Lucas Emma y Antonio", "supervision": "Operación Subdirección técnica local", "prog": 0, "ejec": 0, "cump": 0.0, "tieneMeta": false}, {"mes": "Enero", "servicio": "Jardines Infantiles Diurnos", "modalidad": "Jardín Infantil Nocturno", "unidad": "121826-JINF-SDIS-Luna Lunera", "supervision": "Operación Subdirección técnica local", "prog": 0, "ejec": 0, "cump": 0.0, "tieneMeta": false}, {"mes": "Enero", "servicio": "Jardines Infantiles Diurnos", "modalidad": "Jardín Infantil Nocturno", "unidad": "121875-JINF-SDIS-Noches De Cartagena", "supervision": "Operación Subdirección técnica local", "prog": 0, "ejec": 0, "cump": 0.0, "tieneMeta": false}, {"mes": "Enero", "servicio": "Jardines Infantiles Diurnos", "modalidad": "Casas de Pensamiento Intercultural", "unidad": "122291-JINF-SDIS-Wounaah Chaain Jau Jem Di Baur Do", "supervision": "Operación Subdirección técnica local", "prog": 0, "ejec": 0, "cump": 0.0, "tieneMeta": false}, {"mes": "Enero", "servicio": "Jardines Infantiles Diurnos", "modalidad": "Casas de Pensamiento Intercultural", "unidad": "121816-JINF-SDIS-Yanacona Muyu Kawsay", "supervision": "Operación Subdirección técnica local", "prog": 0, "ejec": 0, "cump": 0.0, "tieneMeta": false}, {"mes": "Enero", "servicio": "Jardines Infantiles Diurnos", "modalidad": "Espacios Rurales", "unidad": "122369-ESRU-Montaña De Colores", "supervision": "Operación Subdirección técnica local", "prog": 0, "ejec": 0, "cump": 0.0, "tieneMeta": false}, {"mes": "Enero", "servicio": "Jardines Infantiles Diurnos", "modalidad": "No Aplica", "unidad": "123096 - Jardin infantil Cofinanciado Casita de San Francisco", "supervision": "Operación Subdirección técnica local", "prog": 0, "ejec": 0, "cump": 0.0, "tieneMeta": false}, {"mes": "Enero", "servicio": "Creciendo Juntos", "modalidad": "No Aplica", "unidad": "No Aplica", "supervision": "Supervisión Subdirección técncia de nivel central", "prog": 0, "ejec": 0, "cump": 0.0, "tieneMeta": false}, {"mes": "Enero", "servicio": "Creciendo Juntos", "modalidad": "Crecemos en la Ruralidad", "unidad": "No Aplica", "supervision": "Operación Subdirección técnica local", "prog": 0, "ejec": 0, "cump": 0.0, "tieneMeta": false}, {"mes": "Enero", "servicio": "Centro Amar", "modalidad": "No Aplica", "unidad": "121102-Centro Amar Ciudad Bolivar", "supervision": "Operación Subdirección técnica local", "prog": 90.0, "ejec": 82.0, "cump": 91.1, "tieneMeta": true}, {"mes": "Enero", "servicio": "Centro Amar", "modalidad": "Centro amar modalidad complementaria", "unidad": "No Aplica", "supervision": "No Aplica", "prog": 0, "ejec": 0, "cump": 0.0, "tieneMeta": false}, {"mes": "Enero", "servicio": "Ciudad Niñez", "modalidad": "No Aplica", "unidad": "No Aplica", "supervision": "No Registrada", "prog": 0, "ejec": 0, "cump": 0.0, "tieneMeta": false}, {"mes": "Enero", "servicio": "El Arte de Cuidar-te", "modalidad": "No Aplica", "unidad": "El Arte de Cuidar-te 122376- Supercade Manitas", "supervision": "Operación Subdirección técncia de nivel central", "prog": 0, "ejec": 0, "cump": 0.0, "tieneMeta": false}, {"mes": "Enero", "servicio": "El Arte de Cuidar-te", "modalidad": "No Aplica", "unidad": "El Arte de Cuidar-te 122780-Mochuelo", "supervision": "Operación Subdirección técncia de nivel central", "prog": 0, "ejec": 0, "cump": 0.0, "tieneMeta": false}, {"mes": "Enero", "servicio": "El Arte de Cuidar-te", "modalidad": "No Aplica", "unidad": "El Arte de Cuidar-te122932-Ecoparque", "supervision": "Operación Subdirección técncia de nivel central", "prog": 0, "ejec": 0, "cump": 0.0, "tieneMeta": false}, {"mes": "Enero", "servicio": "Atrapasueños", "modalidad": "No Aplica", "unidad": "No Aplica", "supervision": "No Registrada", "prog": 0, "ejec": 0, "cump": 0.0, "tieneMeta": false}, {"mes": "Enero", "servicio": "Atrapasueños", "modalidad": "Casas de Memoria Lúdica", "unidad": "No Aplica", "supervision": "No Registrada", "prog": 0, "ejec": 0, "cump": 0.0, "tieneMeta": false}, {"mes": "Enero", "servicio": "Centro Abrazar (por ahora solo aplica para Santa Fe - La Candelaria)", "modalidad": "No Aplica", "unidad": "No Aplica", "supervision": "No Registrada", "prog": 0, "ejec": 0, "cump": 0.0, "tieneMeta": false}, {"mes": "Enero", "servicio": "Forjar Restaurativo", "modalidad": "No Aplica", "unidad": "121140-Forjar Ciudad Bolivar", "supervision": "Operación Subdirección técnica local", "prog": 250.0, "ejec": 0, "cump": 0.0, "tieneMeta": true}, {"mes": "Enero", "servicio": "Casas de Juventud", "modalidad": "No Aplica", "unidad": "Casa de la Juventud 122160- Ciudad Bolivar Ayelen", "supervision": "Operación Subdirección técncia de nivel central", "prog": 0, "ejec": 0, "cump": 0.0, "tieneMeta": false}, {"mes": "Enero", "servicio": "Casas de Juventud", "modalidad": "No Aplica", "unidad": "Casa de Juventud 122636- Paraiso", "supervision": "Operación Subdirección técncia de nivel central", "prog": 0, "ejec": 0, "cump": 0.0, "tieneMeta": false}, {"mes": "Enero", "servicio": "Casas de Juventud", "modalidad": "No Aplica", "unidad": "Casa de la Juventud 122917- Ecoparque", "supervision": "Operación Subdirección técncia de nivel central", "prog": 0, "ejec": 0, "cump": 0.0, "tieneMeta": false}, {"mes": "Enero", "servicio": "Móvil de Abordaje Territorial para el Fenómeno de Habitabilidad en Calle", "modalidad": "No Aplica", "unidad": "No Aplica", "supervision": "Operación Subdirección técncia de nivel central", "prog": 0, "ejec": 0, "cump": 0.0, "tieneMeta": false}, {"mes": "Enero", "servicio": "Autocuidado para Población Habitante de Calle", "modalidad": "No Aplica", "unidad": "No Aplica", "supervision": "No Registrada", "prog": 0, "ejec": 0, "cump": 0.0, "tieneMeta": false}, {"mes": "Enero", "servicio": "Hogar de Paso día y Hogar de Paso Noche para la Atención de la Población Habitante de Calle", "modalidad": "No Aplica", "unidad": "No Aplica", "supervision": "No Registrada", "prog": 0, "ejec": 0, "cump": 0.0, "tieneMeta": false}, {"mes": "Enero", "servicio": "Prevención del Riesgo de Habitar Calle", "modalidad": "No Aplica", "unidad": "No Aplica", "supervision": "No Registrada", "prog": 0, "ejec": 0, "cump": 0.0, "tieneMeta": false}, {"mes": "Enero", "servicio": "Atención y Desarrollo de Capacidades para Mujeres Habitantes de Calle", "modalidad": "No Aplica", "unidad": "No Aplica", "supervision": "No Registrada", "prog": 0, "ejec": 0, "cump": 0.0, "tieneMeta": false}, {"mes": "Enero", "servicio": "Atención Sociosanitaria para Población Habitante de Calle y en Alto Riesgo de estarlo", "modalidad": "No Aplica", "unidad": "No Aplica", "supervision": "No Registrada", "prog": 0, "ejec": 0, "cump": 0.0, "tieneMeta": false}, {"mes": "Enero", "servicio": "Comunidad de Vida para Población Habitante de Calle", "modalidad": "No Aplica", "unidad": "No Aplica", "supervision": "No Registrada", "prog": 0, "ejec": 0, "cump": 0.0, "tieneMeta": false}, {"mes": "Enero", "servicio": "Cuidado Transitorio Día - Noche", "modalidad": "No Aplica", "unidad": "No Aplica", "supervision": "No Registrada", "prog": 0, "ejec": 0, "cump": 0.0, "tieneMeta": false}, {"mes": "Enero", "servicio": "Centro Día a tu Casa", "modalidad": "No Aplica", "unidad": "No Aplica", "supervision": "No Registrada", "prog": 0, "ejec": 0, "cump": 0.0, "tieneMeta": false}, {"mes": "Enero", "servicio": "Comunidad de Cuidado", "modalidad": "No Aplica", "unidad": "No Aplica", "supervision": "No Registrada", "prog": 0, "ejec": 0, "cump": 0.0, "tieneMeta": false}, {"mes": "Enero", "servicio": "Centro Día Casa de la Sabiduría", "modalidad": "No Aplica", "unidad": "122028-Casa de la Sabiduria Carlos Gaviria", "supervision": "Operación Subdirección técnica local", "prog": 444.0, "ejec": 450.0, "cump": 101.4, "tieneMeta": true}, {"mes": "Enero", "servicio": "Centro Día Casa de la Sabiduría", "modalidad": "No Aplica", "unidad": "122216-Casa de la Sabiduria Tejedores de Sueños", "supervision": "Operación Subdirección técnica local", "prog": 312.0, "ejec": 312.0, "cump": 100.0, "tieneMeta": true}, {"mes": "Enero", "servicio": "Centro Día Casa de la Sabiduría", "modalidad": "No Aplica", "unidad": "122335-Casa de la Sabiduria Sierra Morena", "supervision": "Operación Subdirección técnica local", "prog": 1278.0, "ejec": 963.0, "cump": 75.4, "tieneMeta": true}, {"mes": "Enero", "servicio": "Centro Día Casa de la Sabiduría", "modalidad": "No Aplica", "unidad": "122352-Casa de la Sabiduria Las Acacias", "supervision": "Operación Subdirección técnica local", "prog": 630.0, "ejec": 705.0, "cump": 111.9, "tieneMeta": true}, {"mes": "Enero", "servicio": "Centro Día Casa de la Sabiduría", "modalidad": "No Aplica", "unidad": "122633-Casa de la Sabiduria Bella Flor", "supervision": "Operación Subdirección técnica local", "prog": 1080.0, "ejec": 600.0, "cump": 55.6, "tieneMeta": true}, {"mes": "Enero", "servicio": "Centro Día Casa de la Sabiduría", "modalidad": "Centro Día al Barrio", "unidad": "No Aplica", "supervision": "Operación Subdirección técncia de nivel central", "prog": 0, "ejec": 0, "cump": 0.0, "tieneMeta": false}, {"mes": "Enero", "servicio": "Centro Día Casa de la Sabiduría", "modalidad": "Centro Día Redes de Cuidado Comunitario", "unidad": "No Aplica", "supervision": "No Registrada", "prog": 0, "ejec": 0, "cump": 0.0, "tieneMeta": false}, {"mes": "Enero", "servicio": "Bogotá Te Acompaña en la Vejez", "modalidad": "No Aplica", "unidad": "No Aplica", "supervision": "No Registrada", "prog": 0, "ejec": 0, "cump": 0.0, "tieneMeta": false}, {"mes": "Enero", "servicio": "Apoyos Económicos", "modalidad": "Apoyos Económicos", "unidad": "No Aplica", "supervision": "No Registrada", "prog": 7556.0, "ejec": 7556.0, "cump": 100.0, "tieneMeta": true}, {"mes": "Enero", "servicio": "Casas LGBTI", "modalidad": "No Aplica", "unidad": "No Aplica", "supervision": "Operación Subdirección técncia de nivel central", "prog": 0, "ejec": 0, "cump": 0.0, "tieneMeta": false}, {"mes": "Enero", "servicio": "Centros Crecer", "modalidad": "No Aplica", "unidad": "283-Centro Crecer Ecoparque Sierra Morena", "supervision": "Operación Subdirección técnica local", "prog": 97.0, "ejec": 43.0, "cump": 44.3, "tieneMeta": true}, {"mes": "Enero", "servicio": "Centros Crecer", "modalidad": "No Aplica", "unidad": "284-Centro Crecer Vista Hermosa", "supervision": "Operación Subdirección técnica local", "prog": 70.0, "ejec": 48.0, "cump": 68.6, "tieneMeta": true}, {"mes": "Enero", "servicio": "Centro de Desarrollo Comunitario", "modalidad": "No Aplica", "unidad": "281-CDC Arborizadora Alta", "supervision": "Operación Subdirección técnica local", "prog": 2410.0, "ejec": 6.0, "cump": 0.2, "tieneMeta": true}, {"mes": "Enero", "servicio": "Centro de Desarrollo Comunitario", "modalidad": "No Aplica", "unidad": "12293- Ecoparque", "supervision": "Operación Subdirección técnica local", "prog": 705.0, "ejec": 26.0, "cump": 3.7, "tieneMeta": true}, {"mes": "Enero", "servicio": "Tiempo Propio para Personas Cuidadoras (Lavanderias, si aplica)", "modalidad": "No Aplica", "unidad": "122951-Lavanderia Comunitaria-Ecoparque", "supervision": "Operación Subdirección técnica local", "prog": 231.0, "ejec": 30.0, "cump": 13.0, "tieneMeta": true}, {"mes": "Enero", "servicio": "Tiempo Propio para Personas Cuidadoras (Lavanderias, si aplica)", "modalidad": "No Aplica", "unidad": "122811-Lavandería Comunitaria-Manitas", "supervision": "Operación Subdirección técnica local", "prog": 0, "ejec": 0, "cump": 0.0, "tieneMeta": false}, {"mes": "Enero", "servicio": "Gestión del Riesgo", "modalidad": "No Aplica", "unidad": "No Aplica", "supervision": "Operación Subdirección técncia de nivel central", "prog": 0, "ejec": 0, "cump": 0.0, "tieneMeta": false}, {"mes": "Enero", "servicio": "Emergencia Social  * Bono Canjeable por Alimentos.", "modalidad": "No Aplica", "unidad": "No Aplica", "supervision": "Operación Subdirección técnica local", "prog": 0, "ejec": 0, "cump": 0.0, "tieneMeta": false}, {"mes": "Enero", "servicio": "Emergencia Social  * Suministros de ayuda humanitaria no alimentaria (vestuario, calzado y elementos de aseo personal).", "modalidad": "No Aplica", "unidad": "No Aplica", "supervision": "Operación Subdirección técnica local", "prog": 0, "ejec": 0, "cump": 0.0, "tieneMeta": false}, {"mes": "Enero", "servicio": "Integración y los Derechos del Migrante, Refugiado y Retornado", "modalidad": "Centros de Atención Integral al Migrante", "unidad": "No Aplica", "supervision": "No Registrada", "prog": 0, "ejec": 0, "cump": 0.0, "tieneMeta": false}, {"mes": "Enero", "servicio": "Comedores Comunitarios", "modalidad": "No Aplica", "unidad": "114346-Bella Flor", "supervision": "Supervisión Subdirección técncia de nivel central", "prog": 350.0, "ejec": 350.0, "cump": 100.0, "tieneMeta": true}, {"mes": "Enero", "servicio": "Comedores Comunitarios", "modalidad": "No Aplica", "unidad": "113347-Huertas", "supervision": "Supervisión Subdirección técncia de nivel central", "prog": 300.0, "ejec": 300.0, "cump": 100.0, "tieneMeta": true}, {"mes": "Enero", "servicio": "Comedores Comunitarios", "modalidad": "No Aplica", "unidad": "113352-Santa Viviana", "supervision": "Supervisión Subdirección técncia de nivel central", "prog": 300.0, "ejec": 300.0, "cump": 100.0, "tieneMeta": true}, {"mes": "Enero", "servicio": "Comedores Comunitarios", "modalidad": "No Aplica", "unidad": "113380-Los Alpes", "supervision": "Supervisión Subdirección técncia de nivel central", "prog": 400.0, "ejec": 400.0, "cump": 100.0, "tieneMeta": true}, {"mes": "Enero", "servicio": "Comedores Comunitarios", "modalidad": "No Aplica", "unidad": "113399-Juan Pablo II", "supervision": "Supervisión Subdirección técncia de nivel central", "prog": 350.0, "ejec": 350.0, "cump": 100.0, "tieneMeta": true}, {"mes": "Enero", "servicio": "Comedores Comunitarios", "modalidad": "No Aplica", "unidad": "113421-Estrella Del Sur", "supervision": "Supervisión Subdirección técncia de nivel central", "prog": 300.0, "ejec": 300.0, "cump": 100.0, "tieneMeta": true}, {"mes": "Enero", "servicio": "Comedores Comunitarios", "modalidad": "No Aplica", "unidad": "113556-La Estrella", "supervision": "Supervisión Subdirección técncia de nivel central", "prog": 300.0, "ejec": 300.0, "cump": 100.0, "tieneMeta": true}, {"mes": "Enero", "servicio": "Comedores Comunitarios", "modalidad": "No Aplica", "unidad": "113863-Limonar", "supervision": "Supervisión Subdirección técncia de nivel central", "prog": 250.0, "ejec": 248.0, "cump": 99.2, "tieneMeta": true}, {"mes": "Enero", "servicio": "Comedores Comunitarios", "modalidad": "No Aplica", "unidad": "113864-Jerusalén Canteras", "supervision": "Supervisión Subdirección técncia de nivel central", "prog": 250.0, "ejec": 250.0, "cump": 100.0, "tieneMeta": true}, {"mes": "Enero", "servicio": "Comedores Comunitarios", "modalidad": "No Aplica", "unidad": "113-880-Divino Niño", "supervision": "Supervisión Subdirección técncia de nivel central", "prog": 300.0, "ejec": 300.0, "cump": 100.0, "tieneMeta": true}, {"mes": "Enero", "servicio": "Comedores Comunitarios", "modalidad": "No Aplica", "unidad": "113894-San Fernando", "supervision": "Supervisión Subdirección técncia de nivel central", "prog": 300.0, "ejec": 300.0, "cump": 100.0, "tieneMeta": true}, {"mes": "Enero", "servicio": "Comedores Comunitarios", "modalidad": "No Aplica", "unidad": "121602-Arborizadora", "supervision": "Supervisión Subdirección técncia de nivel central", "prog": 350.0, "ejec": 345.0, "cump": 98.6, "tieneMeta": true}, {"mes": "Enero", "servicio": "Comedores Comunitarios", "modalidad": "No Aplica", "unidad": "121605-Perdomo", "supervision": "Supervisión Subdirección técncia de nivel central", "prog": 150.0, "ejec": 146.0, "cump": 97.3, "tieneMeta": true}, {"mes": "Enero", "servicio": "Comedores Comunitarios", "modalidad": "No Aplica", "unidad": "121639-Potosí", "supervision": "Supervisión Subdirección técncia de nivel central", "prog": 300.0, "ejec": 300.0, "cump": 100.0, "tieneMeta": true}, {"mes": "Enero", "servicio": "Comedores Comunitarios", "modalidad": "No Aplica", "unidad": "113342-Paraíso", "supervision": "Supervisión Subdirección técncia de nivel central", "prog": 300.0, "ejec": 300.0, "cump": 100.0, "tieneMeta": true}, {"mes": "Enero", "servicio": "Comedores Comunitarios", "modalidad": "No Aplica", "unidad": "113381-Villas del Progreso", "supervision": "Supervisión Subdirección técncia de nivel central", "prog": 250.0, "ejec": 250.0, "cump": 100.0, "tieneMeta": true}, {"mes": "Enero", "servicio": "Comedores Comunitarios", "modalidad": "No Aplica", "unidad": "113837-Naciones Unidas", "supervision": "Supervisión Subdirección técncia de nivel central", "prog": 300.0, "ejec": 300.0, "cump": 100.0, "tieneMeta": true}, {"mes": "Enero", "servicio": "Comedores Comunitarios", "modalidad": "No Aplica", "unidad": "122959-Los Luceros", "supervision": "Supervisión Subdirección técncia de nivel central", "prog": 300.0, "ejec": 300.0, "cump": 100.0, "tieneMeta": true}, {"mes": "Enero", "servicio": "Comedores Comunitarios", "modalidad": "No Aplica", "unidad": "123046-Mirador 2", "supervision": "Supervisión Subdirección técncia de nivel central", "prog": 300.0, "ejec": 300.0, "cump": 100.0, "tieneMeta": true}, {"mes": "Enero", "servicio": "Comedores Comunitarios", "modalidad": "No Aplica", "unidad": "123045-Mirador de la Estancia", "supervision": "Supervisión Subdirección técncia de nivel central", "prog": 300.0, "ejec": 270.0, "cump": 90.0, "tieneMeta": true}, {"mes": "Enero", "servicio": "Comedores Comunitarios", "modalidad": "No Aplica", "unidad": "123044- QUIBA", "supervision": "Supervisión Subdirección técncia de nivel central", "prog": 200.0, "ejec": 200.0, "cump": 100.0, "tieneMeta": true}, {"mes": "Enero", "servicio": "Compromiso por una Alimentación Incluyente  *Canastas alimentarias: afro, indígena y rural", "modalidad": "No Aplica", "unidad": "No Aplica", "supervision": "Supervisión Subdirección técncia de nivel central", "prog": 187.0, "ejec": 187.0, "cump": 100.0, "tieneMeta": true}, {"mes": "Enero", "servicio": "Compromiso por una Alimentación Incluyente  *Bono de  alimentos: pertenencia étnica indígena y Rrom/Gitano", "modalidad": "No Aplica", "unidad": "No Aplica", "supervision": "Supervisión Subdirección técncia de nivel central", "prog": 179.0, "ejec": 177.0, "cump": 98.9, "tieneMeta": true}];
+
+    const STORAGE_KEY = "TABLERO_SERVICIOS_DATA_2026";
+    let rawData = [];
+    let currentFilteredData = [];
+    let chartInstance = null;
+
+    // Cargar datos
+    function initData() {
+      try {
+        const stored = localStorage.getItem(STORAGE_KEY);
+        if (stored) {
+          rawData = JSON.parse(stored);
+        } else {
+          rawData = window.INITIAL_DATA || window.BASE_DEFAULT_DATA;
+        }
+      } catch (e) {
+        rawData = window.INITIAL_DATA || window.BASE_DEFAULT_DATA;
+      }
+    }
+
+    // Regla de semaforización
+    function getSemaforo(d) {
+      if (!d.tieneMeta || d.prog <= 0) {
+        return { label: "No Aplica", clase: "badge-gray", icon: "⚪", desc: "A Demanda" };
+      }
+      if (d.cump >= 80) return { label: "Verde", clase: "badge-green", icon: "🟢", desc: "Óptimo" };
+      if (d.cump >= 60) return { label: "Amarillo", clase: "badge-yellow", icon: "🟡", desc: "Moderado" };
+      return { label: "Rojo", clase: "badge-red", icon: "🔴", desc: "Crítico" };
+    }
+
+    // Poblar menús desplegables
+    function populateDropdowns() {
+      const servicios = [...new Set(rawData.map(d => d.servicio).filter(Boolean))].sort((a,b) => a.localeCompare(b));
+      const supervisiones = [...new Set(rawData.map(d => d.supervision).filter(Boolean))].sort((a,b) => a.localeCompare(b));
+
+      fillSelect('filtroServicio', servicios, 'Todos los servicios');
+      fillSelect('filtroSupervision', supervisiones, 'Todas las opciones');
+
+      // Sincronizar modalidades dinámicas si vienen adicionales
+      const modalidadesRaw = [...new Set(rawData.map(d => sanitizeModalidad(d.modalidad)).filter(Boolean))];
+      const selectMod = document.getElementById('filtroModalidad');
+      const opcionesExistentes = Array.from(selectMod.options).map(o => o.value);
+      
+      modalidadesRaw.forEach(m => {
+        if (!opcionesExistentes.includes(m) && m !== 'Todos') {
+          const opt = document.createElement('option');
+          opt.value = m;
+          opt.textContent = m;
+          selectMod.appendChild(opt);
+        }
+      });
+    }
+
+    function fillSelect(id, items, defaultLabel = 'Todos') {
+      const select = document.getElementById(id);
+      const curVal = select.value;
+      select.innerHTML = `<option value="Todos">${defaultLabel}</option>`;
+      items.forEach(it => {
+        const opt = document.createElement('option');
+        opt.value = it;
+        opt.textContent = it;
+        select.appendChild(opt);
+      });
+      if (items.includes(curVal)) select.value = curVal;
+    }
+
+    // Aplicar filtros
+    function applyFilters() {
+      const mes = document.getElementById('filtroMes').value;
+      const servicio = document.getElementById('filtroServicio').value;
+      const modalidad = document.getElementById('filtroModalidad').value;
+      const supervision = document.getElementById('filtroSupervision').value;
+      const semaforo = document.getElementById('filtroSemaforo').value;
+      const queryUnidad = normalizeStr(document.getElementById('filtroUnidad').value);
+      const queryGlobal = normalizeStr(document.getElementById('filtroBuscar').value);
+
+      currentFilteredData = rawData.filter(d => {
+        if (mes !== 'Todos' && normalizeStr(d.mes) !== normalizeStr(mes)) return false;
+        if (servicio !== 'Todos' && d.servicio !== servicio) return false;
+        
+        // Comparación tolerante de modalidad
+        if (modalidad !== 'Todos') {
+          const modItem = sanitizeModalidad(d.modalidad);
+          if (normalizeStr(modItem) !== normalizeStr(modalidad)) return false;
+        }
+
+        if (supervision !== 'Todos' && d.supervision !== supervision) return false;
+        
+        const sem = getSemaforo(d).label;
+        if (semaforo !== 'Todos' && sem !== semaforo) return false;
+
+        // Búsqueda en filtro de Unidad
+        if (queryUnidad && !normalizeStr(d.unidad).includes(queryUnidad)) {
+          return false;
+        }
+
+        // Búsqueda global
+        if (queryGlobal) {
+          const u = normalizeStr(d.unidad);
+          const s = normalizeStr(d.servicio);
+          const m = normalizeStr(d.modalidad);
+          if (!u.includes(queryGlobal) && !s.includes(queryGlobal) && !m.includes(queryGlobal)) {
+            return false;
+          }
+        }
+
+        return true;
+      });
+
+      updateUI(currentFilteredData);
+    }
+
+    function updateUI(data) {
+      const totalUnidades = data.length;
+      let totalProg = 0;
+      let totalEjec = 0;
+      let countVerde = 0, countAmarillo = 0, countRojo = 0, countNA = 0;
+
+      data.forEach(d => {
+        if (d.tieneMeta) {
+          totalProg += d.prog;
+          totalEjec += d.ejec;
+        }
+        const sem = getSemaforo(d).label;
+        if (sem === 'Verde') countVerde++;
+        else if (sem === 'Amarillo') countAmarillo++;
+        else if (sem === 'Rojo') countRojo++;
+        else countNA++;
+      });
+
+      const pctGlobal = totalProg > 0 ? ((totalEjec / totalProg) * 100).toFixed(1) : "0.0";
+
+      document.getElementById('kpiUnidades').textContent = totalUnidades.toLocaleString();
+      document.getElementById('kpiProg').textContent = totalProg.toLocaleString();
+      document.getElementById('kpiEjec').textContent = totalEjec.toLocaleString();
+      document.getElementById('kpiCump').textContent = pctGlobal + '%';
+
+      document.getElementById('kpiVerde').textContent = countVerde;
+      const conMeta = countVerde + countAmarillo + countRojo;
+      document.getElementById('kpiVerdePct').textContent = conMeta > 0 ? ((countVerde / conMeta) * 100).toFixed(0) + '% con meta' : '0%';
+      document.getElementById('kpiAmarillo').textContent = countAmarillo;
+      document.getElementById('kpiRojo').textContent = countRojo;
+
+      document.getElementById('legendVerde').textContent = countVerde;
+      document.getElementById('legendAmarillo').textContent = countAmarillo;
+      document.getElementById('legendRojo').textContent = countRojo;
+      document.getElementById('legendNA').textContent = countNA;
+
+      document.getElementById('lblResultadosCount').textContent = `Mostrando ${data.length} de ${rawData.length} registros`;
+
+      // Resumen dinámico
+      const mesSeleccionado = document.getElementById('filtroMes').value;
+      if (mesSeleccionado === 'Todos') {
+        document.getElementById('lblResumenPeriodo').textContent = `Consolidado general: ${totalProg.toLocaleString()} cupos programados frente a ${totalEjec.toLocaleString()} atendidos (${pctGlobal}% de ejecución global).`;
+      } else {
+        document.getElementById('lblResumenPeriodo').textContent = `Mes de ${mesSeleccionado} 2026: ${totalProg.toLocaleString()} cupos programados, ${totalEjec.toLocaleString()} ejecutados (${pctGlobal}% ponderado).`;
+      }
+
+      // Renderizado de tabla
+      const tbody = document.getElementById('tablaCuerpo');
+      tbody.innerHTML = '';
+
+      if (data.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="8" class="text-center py-8 text-slate-400">No se encontraron registros con los filtros seleccionados.</td></tr>`;
+      } else {
+        data.forEach(d => {
+          const sem = getSemaforo(d);
+          const tr = document.createElement('tr');
+          tr.className = "hover:bg-slate-50 transition border-b border-slate-100";
+          tr.innerHTML = `
+            <td class="py-2.5 px-3 font-medium text-slate-500 whitespace-nowrap">${d.mes}</td>
+            <td class="py-2.5 px-3 font-semibold text-slate-900">${d.servicio}</td>
+            <td class="py-2.5 px-3 text-slate-600">${sanitizeModalidad(d.modalidad)}</td>
+            <td class="py-2.5 px-3 font-medium text-slate-800">${d.unidad}</td>
+            <td class="py-2.5 px-3 text-slate-500 text-[11px]">${d.supervision}</td>
+            <td class="py-2.5 px-3 text-right font-medium text-slate-700">${d.tieneMeta ? d.prog.toLocaleString() : '<span class="text-slate-400">N/A</span>'}</td>
+            <td class="py-2.5 px-3 text-right font-semibold text-slate-900">${d.tieneMeta ? d.ejec.toLocaleString() : '<span class="text-slate-400">N/A</span>'}</td>
+            <td class="py-2.5 px-3 text-center">
+              <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold ${sem.clase}">
+                <span>${sem.icon}</span>
+                <span>${d.tieneMeta ? d.cump.toFixed(1) + '%' : 'A demanda'}</span>
+              </span>
+            </td>
+          `;
+          tbody.appendChild(tr);
+        });
+      }
+
+      updateChart(countVerde, countAmarillo, countRojo, countNA);
+      lucide.createIcons();
+    }
+
+    function updateChart(verde, amarillo, rojo, na) {
+      const ctx = document.getElementById('chartSemaforos').getContext('2d');
+      if (chartInstance) chartInstance.destroy();
+
+      chartInstance = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+          labels: ['Óptimo (≥80%)', 'Moderado (60-79%)', 'Crítico (<60%)', 'A Demanda / Sin Meta'],
+          datasets: [{
+            data: [verde, amarillo, rojo, na],
+            backgroundColor: ['#10b981', '#f59e0b', '#ef4444', '#cbd5e1'],
+            borderWidth: 2,
+            borderColor: '#ffffff'
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false }
+          },
+          cutout: '70%'
+        }
+      });
+    }
+
+    // Lector tolerante y normalizado de archivos Excel
+    document.getElementById('excelFileInput').addEventListener('change', function(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = function(evt) {
+        const data = new Uint8Array(evt.target.result);
+        const workbook = XLSX.read(data, { type: 'array' });
+        const newRecords = [];
+
+        workbook.SheetNames.forEach(sheetName => {
+          const normSheet = normalizeStr(sheetName);
+          if (normSheet.includes('intruccion') || normSheet.includes('anexo')) return;
+
+          const sheet = workbook.Sheets[sheetName];
+          const json = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+
+          // Localización inteligente de fila de encabezados
+          let headerRowIdx = -1;
+          for (let i = 0; i < Math.min(25, json.length); i++) {
+            const row = json[i];
+            if (row && row.some(cell => normalizeStr(cell).includes('servicio social'))) {
+              headerRowIdx = i;
+              break;
+            }
+          }
+
+          if (headerRowIdx !== -1) {
+            const headers = json[headerRowIdx].map(h => normalizeStr(h));
+            
+            const colServ = headers.findIndex(h => h.includes('servicio social'));
+            // Detección estricta de la columna 'Modalidad' (evitando 'Forma de implementar el servicio o modalidad')
+            let colMod = headers.findIndex(h => h === 'modalidad');
+            if (colMod === -1) {
+              colMod = headers.findIndex(h => h.includes('modalidad') && !h.includes('forma'));
+            }
+
+            const colUni = headers.findIndex(h => h.includes('nombre unidad') || h.includes('unidad operativa'));
+            const colSup = headers.findIndex(h => h.includes('supervision') || h.includes('operacion'));
+            const colProg = headers.findIndex(h => h.includes('cobertura programada') || h.includes('programada'));
+            const colEjec = headers.findIndex(h => h.includes('cobertura ejecutada') || h.includes('ejecutada'));
+            const colCump = headers.findIndex(h => h.includes('cumplimiento'));
+
+            const mesDetectado = sheetName.split(' ')[0].trim();
+
+            for (let r = headerRowIdx + 1; r < json.length; r++) {
+              const row = json[r];
+              if (!row || !row[colServ]) continue;
+              const servVal = String(row[colServ]).trim();
+              if (servVal === '' || servVal.length < 3 || servVal === 'Servicio Social' || servVal.includes('Localidad')) continue;
+
+              const rawProg = colProg !== -1 ? row[colProg] : 0;
+              const rawEjec = colEjec !== -1 ? row[colEjec] : 0;
+              const rawCump = colCump !== -1 ? row[colCump] : null;
+
+              const progNum = parseFloat(rawProg);
+              const ejecNum = parseFloat(rawEjec);
+              const tieneMeta = !isNaN(progNum) && progNum > 0;
+
+              let cumpNum = 0;
+              if (tieneMeta) {
+                if (rawCump !== null && rawCump !== undefined && !isNaN(parseFloat(rawCump))) {
+                  const val = parseFloat(rawCump);
+                  cumpNum = val <= 1.0 && val > 0 ? val * 100 : val;
+                } else if (!isNaN(ejecNum)) {
+                  cumpNum = (ejecNum / progNum) * 100;
+                }
+              }
+
+              const rawMod = (colMod !== -1 && row[colMod]) ? String(row[colMod]).trim() : 'No Aplica';
+
+              newRecords.push({
+                mes: mesDetectado,
+                servicio: servVal.replace(/\r?\n|\r/g, ' '),
+                modalidad: sanitizeModalidad(rawMod),
+                unidad: (colUni !== -1 && row[colUni]) ? String(row[colUni]).trim() : 'No Aplica',
+                supervision: (colSup !== -1 && row[colSup]) ? String(row[colSup]).trim() : 'No Registrada',
+                prog: tieneMeta ? Math.round(progNum) : 0,
+                ejec: !isNaN(ejecNum) ? Math.round(ejecNum) : 0,
+                cump: Number(cumpNum.toFixed(1)),
+                tieneMeta: tieneMeta
+              });
+            }
+          }
+        });
+
+        if (newRecords.length > 0) {
+          rawData = newRecords;
+          try {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(rawData));
+          } catch(e) {
+            console.warn("No fue posible guardar en localStorage", e);
+          }
+          populateDropdowns();
+          applyFilters();
+          alert(`¡Datos cargados con éxito! Se procesaron ${newRecords.length} registros y se guardaron en la memoria local.`);
+        } else {
+          alert("No se detectaron filas válidas con la estructura del tablero en el archivo.");
+        }
+      };
+      reader.readAsArrayBuffer(file);
+    });
+
+    // Restaurar a la base oficial predeterminada
+    document.getElementById('btnRestaurarBase').addEventListener('click', () => {
+      if (confirm("¿Deseas restaurar la base de datos oficial 2026? Se restablecerán los datos iniciales.")) {
+        localStorage.removeItem(STORAGE_KEY);
+        rawData = window.INITIAL_DATA || window.BASE_DEFAULT_DATA;
+        populateDropdowns();
+        applyFilters();
+        alert("Se ha restablecido la base de datos oficial.");
+      }
+    });
+
+    // Resetear filtros
+    document.getElementById('btnResetFilters').addEventListener('click', () => {
+      document.getElementById('filtroMes').value = 'Todos';
+      document.getElementById('filtroServicio').value = 'Todos';
+      document.getElementById('filtroModalidad').value = 'Todos';
+      document.getElementById('filtroUnidad').value = '';
+      document.getElementById('filtroSupervision').value = 'Todos';
+      document.getElementById('filtroSemaforo').value = 'Todos';
+      document.getElementById('filtroBuscar').value = '';
+      applyFilters();
+    });
+
+    // Event Listeners
+    ['filtroMes', 'filtroServicio', 'filtroModalidad', 'filtroSupervision', 'filtroSemaforo'].forEach(id => {
+      document.getElementById(id).addEventListener('change', applyFilters);
+    });
+    document.getElementById('filtroUnidad').addEventListener('input', applyFilters);
+    document.getElementById('filtroBuscar').addEventListener('input', applyFilters);
+
+    // Exportación limpia a Excel
+    document.getElementById('btnExport').addEventListener('click', () => {
+      if (currentFilteredData.length === 0) {
+        alert("No hay registros en la vista actual para exportar.");
+        return;
+      }
+
+      const cleanExport = currentFilteredData.map(item => ({
+        "Mes": item.mes,
+        "Servicio Social": item.servicio,
+        "Modalidad": sanitizeModalidad(item.modalidad),
+        "Nombre Unidad Operativa": item.unidad,
+        "Supervisión / Operación": item.supervision,
+        "Cobertura Programada": item.tieneMeta ? item.prog : "N/A",
+        "Cobertura Ejecutada": item.tieneMeta ? item.ejec : "N/A",
+        "% Cumplimiento": item.tieneMeta ? item.cump : "A Demanda",
+        "Estado": getSemaforo(item).desc
+      }));
+
+      const ws = XLSX.utils.json_to_sheet(cleanExport);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Servicios_Filtrados");
+      XLSX.writeFile(wb, "Reporte_Seguimiento_Servicios_Limpio_2026.xlsx");
+    });
+
+    // Inicializar al cargar la página
+    window.onload = function() {
+      initData();
+      populateDropdowns();
+      applyFilters();
+      lucide.createIcons();
+    };
+  </script>
+</body>
+</html>
